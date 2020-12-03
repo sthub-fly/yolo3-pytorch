@@ -20,22 +20,37 @@ class DecodeBox(nn.Module):
         self.img_size = img_size
 
     def forward(self, input):
+        '''
+        input为bs  3*（1+4+num_classes),13,13
+            3           表示先验框的个数
+            1           表示是否包含物体
+            4           表示先验框调整的参数
+            num_classes 物品的分类
+        '''
+        #batch_size表示一共有多少图片
         batch_size = input.size(0)
+        #13*13 取出特征层的高和宽
         input_height = input.size(2)
         input_width = input.size(3)
 
-        # 计算步长
+        # 计算步长（感受野)
+        # 每一个特征点对应原来的图片上多少像素点
+        # 如果特征层为13*13的话，一个特征点就对应原来图片上的32个像素点
+        # 416/13 = 32
         stride_h = self.img_size[1] / input_height
         stride_w = self.img_size[0] / input_width
+
         # 归一到特征层上
+        # 把先验框的尺寸调整成特征层大小的形式
+        # 计算出先验框在特征层对应的宽高
         scaled_anchors = [(anchor_width / stride_w, anchor_height / stride_h) for anchor_width, anchor_height in self.anchors]
 
-        # 对预测结果进行resize
+        # 对预测结果进行resize  view表示reshape
         prediction = input.view(batch_size, self.num_anchors,
                                 self.bbox_attrs, input_height, input_width).permute(0, 1, 3, 4, 2).contiguous()
 
         # 先验框的中心位置的调整参数
-        x = torch.sigmoid(prediction[..., 0])  
+        x = torch.sigmoid(prediction[..., 0])   #sigmoid会将输出值固定到0-1之间
         y = torch.sigmoid(prediction[..., 1])
         # 先验框的宽高调整参数
         w = prediction[..., 2]  # Width

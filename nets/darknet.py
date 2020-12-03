@@ -5,19 +5,28 @@ from collections import OrderedDict
 
 # 基本的darknet块
 class BasicBlock(nn.Module):
+    # 定义了两组卷积标准化＋激活函数
     def __init__(self, inplanes, planes):
         super(BasicBlock, self).__init__()
+        # 利用1*1的卷积下降通道数
+        '''
+        Conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True)
+        
+        '''
         self.conv1 = nn.Conv2d(inplanes, planes[0], kernel_size=1,
                                stride=1, padding=0, bias=False)
         self.bn1 = nn.BatchNorm2d(planes[0])
         self.relu1 = nn.LeakyReLU(0.1)
-        
+
+        # 3*3的卷积扩张通道数     减少参数量
         self.conv2 = nn.Conv2d(planes[0], planes[1], kernel_size=3,
                                stride=1, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(planes[1])
         self.relu2 = nn.LeakyReLU(0.1)
 
+    # 参差网络前向传播
     def forward(self, x):
+        # residual（残差边）  out主干边（卷积边）
         residual = x
 
         out = self.conv1(x)
@@ -35,11 +44,13 @@ class BasicBlock(nn.Module):
 class DarkNet(nn.Module):
     def __init__(self, layers):
         super(DarkNet, self).__init__()
-        self.inplanes = 32
+        self.inplanes = 32          #32通道的卷积
+        # 标准化和激活函数
         self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(self.inplanes)
         self.relu1 = nn.LeakyReLU(0.1)
 
+        # make_layer进行残差块的堆叠
         self.layer1 = self._make_layer([32, 64], layers[0])
         self.layer2 = self._make_layer([64, 128], layers[1])
         self.layer3 = self._make_layer([128, 256], layers[2])
@@ -57,7 +68,7 @@ class DarkNet(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
-    def _make_layer(self, planes, blocks):
+    def _make_layer(self, planes, blocks):      #block对应每次残差快的次数DarkNet([1, 2, 8, 8, 4])
         layers = []
         # 下采样，步长为2，卷积核大小为3
         layers.append(("ds_conv", nn.Conv2d(self.inplanes, planes[1], kernel_size=3,
@@ -70,6 +81,7 @@ class DarkNet(nn.Module):
             layers.append(("residual_{}".format(i), BasicBlock(self.inplanes, planes)))
         return nn.Sequential(OrderedDict(layers))
 
+    # 主干网络的三个输出
     def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
@@ -84,7 +96,7 @@ class DarkNet(nn.Module):
         return out3, out4, out5
 
 def darknet53(pretrained, **kwargs):
-    model = DarkNet([1, 2, 8, 8, 4])
+    model = DarkNet([1, 2, 8, 8, 4])     #对应残差块的使用次数
     if pretrained:
         if isinstance(pretrained, str):
             model.load_state_dict(torch.load(pretrained))
